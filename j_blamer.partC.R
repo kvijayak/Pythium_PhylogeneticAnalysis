@@ -21,15 +21,26 @@
 
 ## Import data and Load Packages------
 
+#install.packages("ape")
+library(ape)
+#install.packages("dplyr")
+library(dplyr)
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("plotrix")
+library(plotrix)
+
+#source("https://bioconductor.org/biocLite.R")
+#biocLite("DECIPHER")
+library(DECIPHER)
+#biocLite("Biostrings")
+library(Biostrings)
+
+
 ## BOLD Data tsv File
 pythium <- read_tsv("http://www.boldsystems.org/index.php/API_Public/combined?taxon=Pythium&format=tsv")
 
-#library(ape)
-#library(Biostrings)
-#library(DECIPHER)
-#library(dplyr)
-#library(tidyverse)
-#library(plotrix)
+
 
 ## I'm going to use the markercode with the most data values
 ## 1249 ITS markers, 885 for COI
@@ -56,9 +67,7 @@ bin_to_species.name <- unique(pythiumITS[,c(8,22)])
 
 ## I also removed duplicate rows with the unique() function.  Now, I can relate any bin to any species name, or vice versa. Let's search for the bin associated with our species of interest, p.oligandrum: 
 
-bin_to_species.name[
-  which(str_detect(bin_to_species.name$species_name, 
-                   "Pythium oligandrum")),]
+bin_to_species.name[which(str_detect(bin_to_species.name$species_name, "Pythium oligandrum")),]
 
 
 ## the bin associated with p.oligandrum is BOLD:AA06345.  We can now use this identifier to track our species of interest throughout the remainder of the analysis.  For our alignment and subsequent clustering, we'll take one record (at random) from each unique bin_uri, using the sample_n() function from the dplyr package. I'm also using set.seed in hopes that when this script is re-run, the same "random" collection of records will be subsetted.  If the script is re-run and sample_n takes a different sample of records, the remainder of the downtream analysis may not be reproducable
@@ -74,6 +83,28 @@ length(unique(pythiumITS_sample$bin_uri))
 length(unique(pythiumITS_sample$species_name))
 
 ## We have an outlier in our new dataframe.  The BOLD:ACE4105 bin is highly dissimilar from the other 148 sequences in our set (based on a dendrogram I created not shown in this script).  When I BLASTed this sequence, I actually found that although it is genetic information from the ITS region, it does not belong to any species of pythium.  BLAST returned high-scoring hits for other fungal species, such as Sarocladium kiliense and Nectria mauritiicola.
+nucleotides <- DNAStringSet(pythiumITS_sample$nucleotides)
+Pythium_musclealignment <- DNAStringSet(muscle::muscle(nucleotides, quiet = FALSE, maxiters = 4, diags = FALSE))
+Pythium_musclealignment
+
+dnaBin.pythium <- as.DNAbin(Pythium_musclealignment)
+
+distanceMatrix <- dist.dna(dnaBin.pythium, model = "TN93", as.matrix = TRUE, 
+                           pairwise.deletion = TRUE)
+
+Dendogram.pythium <- IdClusters(distanceMatrix,
+                                method = "UPGMA",
+                                cutoff= 0.03,
+                                showPlot = TRUE,
+                                type = "dendrogram",
+                                verbose = TRUE)
+mean(unlist(lapply(Pythium_musclealignment, str_count, ("-"))))
+min(unlist(lapply(Pythium_musclealignment, str_count, ("-"))))
+which.min(lapply(Pythium_musclealignment, str_count, ("-")))
+
+max(unlist(lapply(Pythium_musclealignment[-129], str_count, ("-"))))
+which.max(lapply(Pythium_musclealignment[-129], str_count, ("-")))
+
 
 pythiumITS_sample <- pythiumITS_sample[-129,]
 
@@ -303,4 +334,5 @@ pythiumITS_mycoparasites %>%
 ## to conclude my script, I wanted to run one more analysis, this time includeing all records from the pythium data that contain a bin_uri.  I thought that including all records with bin_uri information would greatly expand the scope of pythium records, and possibly link other OTUs to the p.oligandrum cluster.  However, when I filtered for all unique bins, I found that only 171 existed in the entire BOLD database.  Considering that my COI analysis contained 169 unique bins, I nearly explored all 171 bins available in the database with my COI analysis, so another analysis including the additional 2 bin_uri's is liklely unnecessary.   
 
 ## In this script, I discovered 3 additional pythium species that are known to exhibit a mycoparacitic phenotype, and an additional 3 with possible mycoparacitic properties.  To answer my origional question: Yes, focusing a known mycoparasite, p.oligandrum, I found 6 additional pythium species with a similar mycoparasitic capabilities.  As I said earlier however, It's not necessarily the ITS and COI-5P sequences that "give" these species their mycoparasitic phenotypes.  An interesting next step would be examine what exactly produces this phenotype, which would likely require an analysis of the pythium genome on a genome-wide scale.
+
 
